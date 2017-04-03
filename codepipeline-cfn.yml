@@ -80,14 +80,20 @@ Resources:
       Policies:
         -
           PolicyName: !Sub ${AWS::StackName}-Pipeline-${AWS::Region}
-          PolicyDocument:
+          PolicyDocument: !Sub |
             {
               "Version": "2012-10-17",
               "Statement": [
                 {
                   "Effect": "Allow",
-                  "Resource": "*",
-                  "Action": "*"
+                  "Action": [
+                    "s3:Get*",
+                    "s3:List*"
+                  ],
+                  "Resource": [
+                    "arn:aws:s3:::aws-codedeploy-us-east-1/*",
+                    "arn:aws:s3:::${PipelineArtifactStore}/*"
+                  ]
                 }
               ]
             }
@@ -125,20 +131,20 @@ Resources:
   CodeDeployServiceRole:
     Type: AWS::IAM::Role
     Properties:
-        Path: /
-        RoleName: !Sub ${ApplicationName}-CodeDeploy-${AWS::Region}
-        AssumeRolePolicyDocument:
-          {
-              "Statement": [{
-                  "Action": "sts:AssumeRole",
-                  "Effect": "Allow",
-                  "Principal": {
-                      "Service": "codedeploy.amazonaws.com"
-                  }
-              }]
-          }
-    ManagedPolicyArns:
-      - 'arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole'
+      Path: /
+      RoleName: !Sub ${ApplicationName}-CodeDeploy-${AWS::Region}
+      AssumeRolePolicyDocument:
+        {
+            "Statement": [{
+                "Action": "sts:AssumeRole",
+                "Effect": "Allow",
+                "Principal": {
+                    "Service": "codedeploy.amazonaws.com"
+                }
+            }]
+        }
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole'
 
   CodePipelineServiceRole:
     Type: 'AWS::IAM::Role'
