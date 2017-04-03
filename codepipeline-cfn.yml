@@ -1,0 +1,373 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Builds, tests, and deploys a java application to a tomcat ec2 server.
+
+Parameters:
+  ApplicationName:
+    Description: Name to be used for creating pipeline components
+    Type: String
+  GitHubOAuthToken:
+    Description: GitHub token to provide read access to repository
+    Type: String
+  GitHubUser:
+    Description: GitHub user that owns the application repo
+    Type: String
+  GitHubRepo:
+    Description: 'GitHub repository name (ex: spring-petclinic)'
+    Type: String
+  BranchName:
+    Description: Branch to build
+    Type: String
+  InstanceType:
+    Description: EC2 Instance type for the Tomcat server
+    Type: String
+    Default: t2.micro
+    AllowedValues: [ t2.nano, t2.micro, t2.small, t2.medium, t2.large ]
+    ConstraintDescription: Must be a valid EC2 t2 instance type
+  KeyName:
+    Description: Name of an existing EC2 Keypair to enable ssh acces to the instance
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: Must be the name of an existing EC2 KeyPair
+  DeploymentNameTag:
+    Description: Unique name tag to give to the EC2 instance
+    Type: String
+
+Mappings:
+  AWSInstanceType2Arch:
+    t1.micro:  { Arch: PV64  }
+    t2.nano:   { Arch: HVM64 }
+    t2.micro:  { Arch: HVM64 }
+    t2.small:  { Arch: HVM64 }
+    t2.medium: { Arch: HVM64 }
+  AWSRegionArch2AMI:
+    us-east-1:      { PV64 : ami-2a69aa47, HVM64 : ami-6869aa05, HVMG2 : ami-bb18efad   }
+    us-west-2:      { PV64 : ami-7f77b31f, HVM64 : ami-7172b611, HVMG2 : ami-31912f51   }
+    us-west-1:      { PV64 : ami-a2490dc2, HVM64 : ami-31490d51, HVMG2 : ami-0a9dcf6a   }
+    eu-west-1:      { PV64 : ami-4cdd453f, HVM64 : ami-f9dd458a, HVMG2 : ami-873e61e1   }
+    eu-west-2:      { PV64 : NOT_SUPPORTED, HVM64 : ami-886369ec, HVMG2 : NOT_SUPPORTED }
+    eu-central-1:   { PV64 : ami-6527cf0a, HVM64 : ami-ea26ce85, HVMG2 : ami-a16ba4ce   }
+    ap-northeast-1: { PV64 : ami-3e42b65f, HVM64 : ami-374db956, HVMG2 : ami-6b443f0c   }
+    ap-northeast-2: { PV64 : NOT_SUPPORTED, HVM64 : ami-2b408b45, HVMG2 : NOT_SUPPORTED }
+    ap-southeast-1: { PV64 : ami-df9e4cbc, HVM64 : ami-a59b49c6, HVMG2 : ami-1c0ba17f   }
+    ap-southeast-2: { PV64 : ami-63351d00, HVM64 : ami-dc361ebf, HVMG2 : ami-bf0d0adc   }
+    ap-south-1:     { PV64 : NOT_SUPPORTED, HVM64 : ami-ffbdd790, HVMG2 : ami-6135440e  }
+    us-east-2:      { PV64 : NOT_SUPPORTED, HVM64 : ami-f6035893, HVMG2 : NOT_SUPPORTED }
+    ca-central-1:   { PV64 : NOT_SUPPORTED, HVM64 : ami-730ebd17, HVMG2 : NOT_SUPPORTED }
+    sa-east-1:      { PV64 : ami-1ad34676, HVM64 : ami-6dd04501, HVMG2 : NOT_SUPPORTED  }
+    cn-north-1:     { PV64 : ami-77559f1a, HVM64 : ami-8e6aa0e3, HVMG2 : NOT_SUPPORTED  }
+
+Resources:
+
+  ##############################
+  # Service Roles
+  ##############################
+
+  TomcatInstanceServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ec2.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        }
+      Policies:
+        -
+          PolicyName: !Sub ${AWS::StackName}-Pipeline-${AWS::Region}
+          PolicyDocument:
+            {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Resource": "*",
+                  "Action": "*"
+                }
+              ]
+            }
+
+  CodeBuildServiceRole:
+      Type: AWS::IAM::Role
+      Properties:
+          Path: /
+          RoleName: !Sub ${ApplicationName}-CodeBuild-${AWS::Region}
+          AssumeRolePolicyDocument:
+            {
+                "Statement": [{
+                    "Action": "sts:AssumeRole",
+                    "Effect": "Allow",
+                    "Principal": {
+                        "Service": "codebuild.amazonaws.com"
+                    }
+                }]
+            }
+          Policies:
+            -
+              PolicyName: !Sub ${ApplicationName}-CodeBuild-${AWS::Region}
+              PolicyDocument:
+                {
+                  "Version": "2012-10-17",
+                  "Statement": [
+                    {
+                      "Effect": "Allow",
+                      "Resource": "*",
+                      "Action": "*"
+                    }
+                  ]
+                }
+
+  CodeDeployServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+        Path: /
+        RoleName: !Sub ${ApplicationName}-CodeDeploy-${AWS::Region}
+        AssumeRolePolicyDocument:
+          {
+              "Statement": [{
+                  "Action": "sts:AssumeRole",
+                  "Effect": "Allow",
+                  "Principal": {
+                      "Service": "codedeploy.amazonaws.com"
+                  }
+              }]
+          }
+    ManagedPolicyArns:
+      - 'arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole'
+
+  CodePipelineServiceRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "codepipeline.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        }
+      Policies:
+        -
+          PolicyName: !Sub ${AWS::StackName}-Pipeline-${AWS::Region}
+          PolicyDocument:
+            {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Resource": "*", #!Sub "arn:aws:s3::::${PipelineArtifactStore}/*",
+                  "Action": "*"
+                }
+              ]
+            }
+
+  ##############################
+  # EC2 Resources
+  ##############################
+
+  IamInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref TomcatInstanceServiceRole
+
+  WebServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable SSH and HTTP access
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 22, ToPort: 22, CidrIp: 0.0.0.0/0 }
+        - { IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: 0.0.0.0/0 }
+
+  TomcatInstance:
+    Type: AWS::EC2::Instance
+    Metadata:
+      AWS::CloudFormation::Init:
+        InstallServices:
+          packages:
+            yum:
+              ruby: []
+              wget: []
+              httpd: []
+              tomcat7: []
+          files:
+            /etc/httpd/conf.d/tomcatvh.conf:
+              content: |
+                <VirtualHost *:80>
+                  ProxyPass / http://localhost:8080/
+                  ProxyPassReverse / http://localhost:8080/
+                </VirtualHost>
+              mode: 000644
+              owner: root
+              group: root
+          services:
+            sysvinit:
+              httpd:
+                enabled: true
+                ensureRunning: true
+              tomcat7:
+                enabled: true
+                ensureRunning: true
+        configSets:
+          default: [ InstallServices ]
+    Properties:
+      InstanceType: !Ref InstanceType
+      SecurityGroups:
+        - !Ref WebServerSecurityGroup
+      KeyName: !Ref KeyName
+      ImageId: !FindInMap [ AWSRegionArch2AMI, !Ref 'AWS::Region', !FindInMap [ AWSInstanceType2Arch, !Ref InstanceType, Arch ] ]
+      IamInstanceProfile: !Ref IamInstanceProfile
+      Tags:
+        -
+          Key: Name
+          Value: !Ref DeploymentNameTag
+      UserData:
+        Fn::Base64:
+          Fn::Sub: |
+            #!/bin/bash -xe
+
+            yum -y update
+
+            /opt/aws/bin/cfn-init -v    \
+              --stack ${AWS::StackName} \
+              --resource TomcatInstance \
+              --region ${AWS::Region}
+
+            # Install CodeDeploy agent
+            wget https://aws-codedeploy-us-east-1.s3.amazonaws.com/latest/install \
+                 -O /tmp/install-cda
+            chmod +x /tmp/install-cda
+            /tmp/install-cda auto
+            rm /tmp/install-cda
+
+            /opt/aws/bin/cfn-signal -e $? \
+              --stack ${AWS::StackName}   \
+              --resource TomcatInstance   \
+              --region ${AWS::Region}
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT5M
+
+  ##############################
+  # Pipeline Resources
+  ##############################
+
+  CodeBuild:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Ref ApplicationName
+      Description: !Sub Build project for ${ApplicationName}
+      ServiceRole: !Ref CodeBuildServiceRole
+      Source:
+        Type: CODEPIPELINE
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Type: LINUX_CONTAINER
+        Image: aws/codebuild/java:openjdk-8
+      Artifacts:
+        Name: !Ref ApplicationName
+        Type: CODEPIPELINE
+
+  Deployment:
+    Type: AWS::CodeDeploy::Application
+    Properties:
+      ApplicationName: !Ref ApplicationName
+
+  DeploymentGroup:
+    Type: AWS::CodeDeploy::DeploymentGroup
+    Properties:
+      ApplicationName: !Ref ApplicationName
+      ServiceRoleArn: !GetAtt CodeDeployServiceRole.Arn
+      Ec2TagFilters:
+        -
+          Key: Name
+          Value: !Ref DeploymentNameTag
+          Type: KEY_AND_VALUE
+
+  PipelineArtifactStore:
+    Type: 'AWS::S3::Bucket'
+
+  ApplicationPipeline:
+    Type: 'AWS::CodePipeline::Pipeline'
+    DependsOn:
+      - IamInstanceProfile
+      - TomcatInstance
+    Properties:
+      RoleArn: !GetAtt CodePipelineServiceRole.Arn
+      ArtifactStore:
+        Type: S3
+        Location: !Ref PipelineArtifactStore
+      Stages:
+        -
+          Name: Source
+          Actions:
+            -
+              Name: SourceAction
+              ActionTypeId:
+                Category: Source
+                Owner: ThirdParty
+                Version: 1
+                Provider: GitHub
+              Configuration:
+                Owner: !Ref GitHubUser
+                Repo: !Ref GitHubRepo
+                Branch: !Ref BranchName
+                OAuthToken: !Ref GitHubOAuthToken
+              OutputArtifacts:
+                -
+                  Name: Source
+              RunOrder: 1
+        -
+          Name: Build
+          Actions:
+            -
+              Name: BuildAction
+              InputArtifacts:
+                -
+                  Name: Source
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              OutputArtifacts:
+                -
+                  Name: Built
+              Configuration:
+                ProjectName: !Ref CodeBuild
+              RunOrder: 1
+        -
+          Name: Deploy
+          Actions:
+            -
+              Name: DeployAction
+              InputArtifacts:
+                -
+                  Name: Built
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: CodeDeploy
+              Configuration:
+                ApplicationName: !Ref ApplicationName
+                DeploymentGroupName: !Ref DeploymentGroup
+              RunOrder: 1
+
+Outputs:
+  PipelineName:
+    Description: Name of the newly created Pipeline
+    Value: !Ref ApplicationPipeline
+  InstancePublicDnsName:
+    Description: Public DNS Name of the newly created Tomcat instance
+    Value: !GetAtt TomcatInstance.PublicDnsName
