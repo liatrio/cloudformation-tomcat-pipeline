@@ -105,25 +105,42 @@ Resources:
           RoleName: !Sub ${ApplicationName}-CodeBuild-${AWS::Region}
           AssumeRolePolicyDocument:
             {
-                "Statement": [{
-                    "Action": "sts:AssumeRole",
-                    "Effect": "Allow",
-                    "Principal": {
-                        "Service": "codebuild.amazonaws.com"
-                    }
-                }]
+              "Statement": [{
+                "Action": "sts:AssumeRole",
+                "Effect": "Allow",
+                "Principal": {
+                  "Service": "codebuild.amazonaws.com"
+                }
+              }]
             }
           Policies:
             -
               PolicyName: !Sub ${ApplicationName}-CodeBuild-${AWS::Region}
-              PolicyDocument:
+              PolicyDocument: !Sub |
                 {
                   "Version": "2012-10-17",
                   "Statement": [
                     {
                       "Effect": "Allow",
-                      "Resource": "*",
-                      "Action": "*"
+                      "Resource": [
+                        "*"
+                      ],
+                      "Action": [
+                        "logs:CreateLogGroup",
+                        "logs:CreateLogStream",
+                        "logs:PutLogEvents"
+                      ]
+                    },
+                    {
+                      "Effect": "Allow",
+                      "Resource": [
+                        "arn:aws:s3:::${PipelineArtifactStore}/*"
+                      ],
+                      "Action": [
+                        "s3:GetObject",
+                        "s3:GetObjectVersion",
+                        "s3:PutObject"
+                      ]
                     }
                   ]
                 }
