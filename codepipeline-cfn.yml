@@ -371,8 +371,7 @@ Resources:
                 Branch: !Ref BranchName
                 OAuthToken: !Ref GitHubOAuthToken
               OutputArtifacts:
-                -
-                  Name: Source
+                - Name: Source
               RunOrder: 1
         -
           Name: Build
@@ -380,27 +379,34 @@ Resources:
             -
               Name: BuildAction
               InputArtifacts:
-                -
-                  Name: Source
+                - Name: Source
               ActionTypeId:
                 Category: Build
                 Owner: AWS
                 Version: 1
                 Provider: CodeBuild
               OutputArtifacts:
-                -
-                  Name: Built
+                - Name: Built
               Configuration:
                 ProjectName: !Ref CodeBuild
               RunOrder: 1
+        -
+          Name: Approval
+          Actions:
+            -
+              Name: ProductionGate
+              ActionTypeId:
+                Category: Approval
+                Owner: AWS
+                Version: 1
+                Provider: Manual
         -
           Name: Deploy
           Actions:
             -
               Name: DeployAction
               InputArtifacts:
-                -
-                  Name: Built
+                - Name: Built
               ActionTypeId:
                 Category: Deploy
                 Owner: AWS
