@@ -35,3 +35,10 @@ its way down the pipeline.
 from the output tab of the CloudFormation stack. Then navigate to <ec2-public-dns-name>/petclinic.
 
 ![Petclinic application](https://s3-us-west-2.amazonaws.com/codepipeline-blog/petclinic-application.png)
+
+## Approving a Build  
+  
+See put-approval-result directory for three ways to approve a manual approval step in a Code Pipeline.  
+The first way can be ran via Python 2.7 anywhere `basic.py`.  
+`viaAlexa.py` returns a result that is configured for Alexa.  
+`viaIoT.py` is meant to be utilized in a Lambda function triggered by an IoT Button.  
