@@ -350,6 +350,7 @@ Resources:
       - IamInstanceProfile
       - TomcatInstance
     Properties:
+      Name: !Ref ApplicationName
       RoleArn: !GetAtt CodePipelineServiceRole.Arn
       ArtifactStore:
         Type: S3
@@ -421,6 +422,12 @@ Outputs:
   PipelineName:
     Description: Name of the newly created Pipeline
     Value: !Ref ApplicationPipeline
+  ApprovalStageName:
+    Description: Name of the approval stage in the CodePipeline
+    Value: ProductionGate
+  ApprovalActionName:
+    Description: Name of the approval action in the approval stage of the CodePipeline.
+    Value: ProductionGate
   InstancePublicDnsName:
     Description: Public DNS Name of the newly created Tomcat instance
     Value: !GetAtt TomcatInstance.PublicDnsName
