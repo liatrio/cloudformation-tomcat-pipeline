@@ -419,15 +419,9 @@ Resources:
               RunOrder: 1
 
 Outputs:
-  PipelineName:
-    Description: Name of the newly created Pipeline
-    Value: !Ref ApplicationPipeline
-  ApprovalStageName:
-    Description: Name of the approval stage in the CodePipeline
-    Value: ProductionGate
-  ApprovalActionName:
-    Description: Name of the approval action in the approval stage of the CodePipeline.
-    Value: ProductionGate
   InstancePublicDnsName:
     Description: Public DNS Name of the newly created Tomcat instance
-    Value: !GetAtt TomcatInstance.PublicDnsName
+    Value: !Sub http://${TomcatInstance.PublicDnsName}
+  Pipeline:
+    Description: Url to the newly created Pipeline
+    Value: !Sub 'https://console.aws.amazon.com/codepipeline/home#/view/${ApplicationPipeline}'
