@@ -36,7 +36,7 @@ from the output tab of the CloudFormation stack. Then navigate to <ec2-public-dn
 
 ![Petclinic application](https://s3-us-west-2.amazonaws.com/codepipeline-blog/petclinic-application.png)
 
-## Approving a Build  
+## Programmatically Approving a Pipeline Manual-approval-step
   
 See put-approval-result directory for three ways to approve a manual approval step in a Code Pipeline.  
 The first way can be ran via Python 2.7 anywhere `basic.py`.  
