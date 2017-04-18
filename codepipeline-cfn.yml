@@ -97,6 +97,120 @@ Resources:
                 }
               ]
             }
+            
+  AlexaServiceRole:
+    Type: AWS::IAM::Role
+      Properties:
+      AssumeRolePolicyDocument:
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ec2.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+           ]
+         }
+       Policies:
+       -
+         PolicyName: AWSLambdaFullAcess
+         PolicyDocument:
+           {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "cloudwatch:*",
+                  "cognito-identity:ListIdentityPools",
+                  "cognito-sync:GetCognitoEvents",
+                  "cognito-sync:SetCognitoEvents",
+                  "dynamodb:*",
+                  "events:*",
+                  "iam:ListAttachedRolePolicies",
+                  "iam:ListRolePolicies",
+                  "iam:ListRoles",
+                  "iam:PassRole",
+                  "kinesis:DescribeStream",
+                  "kinesis:ListStreams",
+                  "kinesis:PutRecord",
+                  "lambda:*",
+                  "logs:*",
+                  "s3:*",
+                  "sns:ListSubscriptions",
+                  "sns:ListSubscriptionsByTopic",
+                  "sns:ListTopics",
+                  "sns:Subscribe",
+                  "sns:Unsubscribe",
+                  "sns:Publish",
+                  "sqs:ListQueues",
+                  "sqs:SendMessage",
+                  "kms:ListAliases",
+                  "ec2:DescribeVpcs",
+                  "ec2:DescribeSubnets",
+                  "ec2:DescribeSecurityGroups",
+                  "iot:*",
+                ],
+                "Resource": "*"
+              }
+            ]
+          }
+       -
+         PolicyName: AWSCodePipeFullAccess
+         PolicyDocument:
+           {
+              "Statement": [
+                  {
+                      "Action": [
+                          "codepipeline:*",
+                          "iam:ListRoles",
+                          "iam:PassRole",
+                          "s3:CreateBucket",
+                          "s3:GetBucketPolicy",
+                          "s3:GetObject",
+                          "s3:ListAllMyBuckets",
+                          "s3:ListBucket",
+                          "s3:PutBucketPolicy",
+                          "codecommit:ListBranches",
+                          "codecommit:ListRepositories",
+                          "codedeploy:GetApplication",
+                          "codedeploy:GetDeploymentGroup",
+                          "codedeploy:ListApplications",
+                          "codedeploy:ListDeploymentGroups",
+                          "elasticbeanstalk:DescribeApplications",
+                          "elasticbeanstalk:DescribeEnvironments",
+                          "lambda:GetFunctionConfiguration",
+                          "lambda:ListFunctions",
+                          "opsworks:DescribeApps",
+                          "opsworks:DescribeLayers",
+                          "opsworks:DescribeStacks",
+                          "cloudformation:DescribeStacks",
+                          "cloudformation:ListChangeSets"
+                      ],
+                      "Effect": "Allow",
+                      "Resource": "*"
+                  }
+              ],
+              "Version": "2012-10-17"
+          }
+        -
+         PolicyName: AWSIOTFullAcess
+         PolicyDocument:
+           {
+              "Version": "2012-10-17",
+              "Statement": [
+                  {
+                      "Effect": "Allow",
+                      "Action": [
+                          "iot:*"
+                      ],
+                      "Resource": "*"
+                 }
+              ]
+          }
 
   CodeBuildServiceRole:
       Type: AWS::IAM::Role
